@@ -1,7 +1,7 @@
 # streamlit_app.py
 import requests, streamlit as st
 
-WEBHOOK = "https://hook.eu2.make.com/syxvccar1q9bkkcilcjcni7437v9yqd4"
+WEBHOOK = "https://hook.eu2.make.com/6m46qtelfmarmwpq1jqgomm403eg5xkw"
 
 st.set_page_config(page_title="LinkedIn bot", page_icon="📝")
 st.title("LinkedIn bot 📝")
