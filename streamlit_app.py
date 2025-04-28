@@ -1,11 +1,12 @@
 # streamlit_app.py
 import requests, streamlit as st
 
-WEBHOOK = "https://hook.eu2.make.com/syxvccar1q9bkkcilcjcni7437v9yqd4"  # ← Make webhook
+WEBHOOK = "https://hook.eu2.make.com/syxvccar1q9bkkcilcjcni7437v9yqd4"
 
 st.set_page_config(page_title="LinkedIn bot", page_icon="📝")
 st.title("LinkedIn bot 📝")
 
+# ----------------------- formulář ---------------------------------------------
 with st.form("form"):
     topic = st.text_area("Jaké má být téma příspěvku?")
     persona = st.radio(
@@ -15,12 +16,12 @@ with st.form("form"):
     email = st.text_input("Na jaký e-mail poslat draft?")
     ok = st.form_submit_button("Odeslat")
 
+# ----------------------- odeslání do Make --------------------------------------
 if ok:
-    # ⬇︎ JSON ve formátu, který Make očekává
     data = {
-        "personName": persona,       # <jméno persony>
-        "postContent": topic,        # <obsah příspěvku>
-        "responseMail": email        # <e-mail pro zaslání draftu>
+        "personName": persona,
+        "postContent": topic,
+        "responseMail": email
     }
 
     with st.spinner("Generuji pomocí ChatGPT…"):
@@ -30,12 +31,13 @@ if ok:
         st.error(f"Chyba {res.status_code}: {res.text}")
         st.stop()
 
-    # bezpečné načtení odpovědi (ať je to JSON objekt nebo prostý text)
     try:
         payload = res.json()
         post = payload["post"] if isinstance(payload, dict) else str(payload)
     except ValueError:
         post = res.text
 
+    # ---------- zobraz výsledný post v podobě čitelného textu ------------------
+    post_md = post.strip().replace("\n", "  \n")   # 2 mezery + \n = hard-break v MD
     st.success("Hotovo! Zde je vygenerovaný příspěvek:")
-    st.code(post, language="markdown")
+    st.markdown(post_md)
