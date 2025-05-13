@@ -10,21 +10,16 @@ import requests, streamlit as st
 WEBHOOK_POST        = "https://hook.eu2.make.com/6m46qtelfmarmwpq1jqgomm403eg5xkw"
 WEBHOOK_PERSONA_ADD = "https://hook.eu2.make.com/9yo8y77db7i6do272joo7ybfoue1qcoc"
 
-# --------- Výchozí seznam person ---------------------------------------------
 DEFAULT_PERSONAS = [
     "Daniel Šturm", "Martin Cígler", "Marek Steiger",
     "Kristína Pastierik", "Lucie Jahnová"
 ]
 
-# --------- Session‑state ------------------------------------------------------
 if "person_list" not in st.session_state:
     st.session_state.person_list = DEFAULT_PERSONAS.copy()
 
 def rerun():
-    if hasattr(st, "rerun"):
-        st.rerun()
-    else:
-        st.experimental_rerun()
+    (st.rerun if hasattr(st, "rerun") else st.experimental_rerun)()
 
 # ------------------------------------------------------------------------------
 st.set_page_config(page_title="LinkedIn bot", page_icon="📝")
@@ -41,14 +36,13 @@ with tab_post:
             "Čím stylem má být příspěvek napsán?",
             st.session_state.person_list
         )
-        email = st.text_input("Na jaký e‑mail poslat draft?")
         submitted_post = st.form_submit_button("Odeslat")
 
     if submitted_post:
         payload = {
-            "personName":   persona,
-            "postContent":  topic,
-            "responseMail": email
+            "personName":  persona,
+            "postContent": topic
+            # e‑mail jsme odstranili
         }
 
         with st.spinner("Generuji pomocí ChatGPT…"):
@@ -84,12 +78,7 @@ with tab_persona:
             lang_choices = ("Čeština", "Slovenština", "Angličtina", "Jiný")
             lang   = st.selectbox("Jazyk*", lang_choices)
 
-            # Pokud je vybráno „Jiný“, zobraz další pole
-            if lang == "Jiný":
-                custom_lang = st.text_input("Zadejte název jazyka*")
-            else:
-                custom_lang = ""
-
+            custom_lang = st.text_input("Zadejte název jazyka*") if lang == "Jiný" else ""
             sample = st.text_area("Ukázkový příspěvek*")
 
         submitted_persona_add = st.form_submit_button("Uložit personu")
