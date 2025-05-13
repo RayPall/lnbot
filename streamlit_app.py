@@ -1,61 +1,38 @@
 # streamlit_app.py
-# ------------------------------------------------------------------------------
-# Aplikace:
-#   1) Generování LinkedIn postu (s optional URL → text se pošle do Make)
-#   2) Přidání nové persony (okamžitě se objeví v seznamu)
-# ------------------------------------------------------------------------------
-# ZÁVISLOSTI: streamlit, requests, beautifulsoup4
-#   pip install -r requirements.txt   (přidej beautifulsoup4)
-# ------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Jednostránková aplikace:
+#   • Generování LinkedIn příspěvku (odeslání na WEBHOOK_POST)
+#   • Přidání nové persony (odeslání na WEBHOOK_PERSONA + okamžitá aktualizace listu)
+# ---------------------------------------------------------------------------
 
-import json, re, requests, streamlit as st
-from bs4 import BeautifulSoup
+import json
+import requests
+import streamlit as st
 
-# --- Make webhooky ------------------------------------------------------------
+# --- Konstanta: Make webhooky -------------------------------------------------
 WEBHOOK_POST    = "https://hook.eu2.make.com/6m46qtelfmarmwpq1jqgomm403eg5xkw"
-WEBHOOK_PERSONA = "https://hook.eu2.make.com/9yo8y77db7i6do272joo7ybfoue1qcoc"   # ← doplň
+WEBHOOK_PERSONA = "https://hook.eu2.make.com/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"   # ← doplň svoji URL
 
-# --- Výchozí persony ----------------------------------------------------------
+# --- Výchozí seznam person ----------------------------------------------------
 DEFAULT_PERSONAS = [
     "Daniel Šturm", "Martin Cígler", "Marek Steiger",
     "Kristína Pastierik", "Lucie Jahnová"
 ]
 
-# --- Session state ------------------------------------------------------------
+# --- Inicializace session_state ----------------------------------------------
 if "person_list" not in st.session_state:
     st.session_state.person_list = DEFAULT_PERSONAS.copy()
+
 if "show_persona_form" not in st.session_state:
     st.session_state.show_persona_form = False
 
-# ------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------- 
 st.set_page_config(page_title="LinkedIn bot", page_icon="📝")
 st.title("LinkedIn bot 📝")
 
-# ------------------------------------------------------------------------------ 
-# Pomocná funkce: vytáhnout text z landing page
-# ------------------------------------------------------------------------------
-def extract_page_text(url: str, max_chars: int = 2000) -> str:
-    r = requests.get(
-        url,
-        timeout=10,
-        headers={"User-Agent": "Mozilla/5.0 (compatible; LinkedIn-bot/1.0)"}
-    )
-    r.raise_for_status()
-
-    soup = BeautifulSoup(r.text, "html.parser")
-
-    for tag in soup(["script", "style", "noscript"]):
-        tag.decompose()
-
-    text = soup.get_text(separator="\n")
-    text = re.sub(r"\s+\n", "\n", text)          # odmazat konce řádků s mezerami
-    text = re.sub(r"\n{3,}", "\n\n", text).strip()
-    return text[:max_chars]
-
-# ============================= 1) FORMULÁŘ POSTU ==============================
+# ===================== 1) GENERÁTOR PŘÍSPĚVKU =================================
 with st.form("post_form"):
     topic = st.text_area("Jaké má být téma příspěvku?")
-    landing_url = st.text_input("URL stránky (volitelně)")
     persona = st.radio(
         "Čím stylem má být příspěvek napsán?",
         st.session_state.person_list
@@ -65,18 +42,10 @@ with st.form("post_form"):
 
 # ---- Odeslat na Make ---------------------------------------------------------
 if submitted_post:
-    page_excerpt = ""
-    if landing_url.strip():
-        try:
-            page_excerpt = extract_page_text(landing_url.strip())
-        except Exception as e:
-            st.warning(f"Nepodařilo se načíst stránku: {e}")
-
     post_payload = {
         "personName":   persona,
         "postContent":  topic,
-        "responseMail": email,
-        "sourcePage":   page_excerpt          # nový klíč
+        "responseMail": email
     }
 
     with st.spinner("Generuji pomocí ChatGPT…"):
@@ -87,19 +56,21 @@ if submitted_post:
             st.error(f"Chyba při komunikaci s Make: {e}")
             st.stop()
 
+    # bezpečné vytažení klíče „post“
     try:
         post_text = res.json().get("post", "")
     except (ValueError, AttributeError):
-        post_text = res.text                     # fallback
+        post_text = res.text
 
-    post_md = post_text.strip().replace("\n", "  \n")
+    post_md = post_text.strip().replace("\n", "  \n")   # 2 mezery = hard‑break
     st.success("Hotovo! Zde je vygenerovaný příspěvek:")
     st.markdown(post_md)
 
-# ============================ 2) PŘIDAT PERSONU ===============================
+# ===================== 2) PŘIDAT NOVOU PERSONU ================================
 st.markdown("---")
 st.header("➕ Přidat novou personu")
 
+# -- přepínač mezi tlačítkem a formulářem --------------------------------------
 if not st.session_state.show_persona_form:
     if st.button("Přidat personu"):
         st.session_state.show_persona_form = True
@@ -120,6 +91,7 @@ else:
 
         submitted_persona = st.form_submit_button("Uložit personu")
 
+    # ---- Odeslat novou personu na Make ---------------------------------------
     if submitted_persona:
         if not name.strip():
             st.error("Jméno je povinné.")
@@ -142,6 +114,7 @@ else:
                 st.error(f"Chyba při ukládání: {e}")
                 st.stop()
 
+        # úspěch -> přidat do seznamu a obnovit UI
         st.session_state.person_list.append(name.strip())
         st.session_state.show_persona_form = False
         st.success("Persona uložena ✔️")
