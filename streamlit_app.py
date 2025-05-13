@@ -1,6 +1,7 @@
 # streamlit_app.py
 import requests, streamlit as st
 
+# ⬇︎ nový Make webhook
 WEBHOOK = "https://hook.eu2.make.com/6m46qtelfmarmwpq1jqgomm403eg5xkw"
 
 st.set_page_config(page_title="LinkedIn bot", page_icon="📝")
@@ -38,6 +39,6 @@ if ok:
         post = res.text
 
     # ---------- zobraz výsledný post v podobě čitelného textu ------------------
-    post_md = post.strip().replace("\n", "  \n")   # 2 mezery + \n = hard-break v MD
+    post_md = post.strip().replace("\n", "  \n")   # 2 mezery + \n = hard‑break v MD
     st.success("Hotovo! Zde je vygenerovaný příspěvek:")
     st.markdown(post_md)
