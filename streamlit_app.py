@@ -1,16 +1,14 @@
 # streamlit_app.py
 # ---------------------------------------------------------------------------
 #  ✍️  Vygenerovat příspěvek     (WEBHOOK_POST)
-#  ➕  Přidat personu            (WEBHOOK_PERSONA)
-#  🗑  Smazat personu            (WEBHOOK_DELETE_PERSONA)
+#  ➕  Přidat personu            (WEBHOOK_PERSONA_ADD)
 # ---------------------------------------------------------------------------
 
 import requests, streamlit as st
 
 # --------- Make webhooky ------------------------------------------------------
-WEBHOOK_POST           = "https://hook.eu2.make.com/6m46qtelfmarmwpq1jqgomm403eg5xkw"
-WEBHOOK_PERSONA_ADD    = "https://hook.eu2.make.com/9yo8y77db7i6do272joo7ybfoue1qcoc"
-WEBHOOK_PERSONA_DELETE = "https://hook.eu2.make.com/v95j3ouaspqnpbajtfeh9umh4qn537s7"
+WEBHOOK_POST        = "https://hook.eu2.make.com/6m46qtelfmarmwpq1jqgomm403eg5xkw"
+WEBHOOK_PERSONA_ADD = "https://hook.eu2.make.com/9yo8y77db7i6do272joo7ybfoue1qcoc"
 
 # --------- Výchozí seznam person ---------------------------------------------
 DEFAULT_PERSONAS = [
@@ -32,7 +30,7 @@ def rerun():
 st.set_page_config(page_title="LinkedIn bot", page_icon="📝")
 st.title("LinkedIn bot")
 
-tab_post, tab_persona = st.tabs(["✍️ Vygenerovat příspěvek", "🛠 Správa person"])
+tab_post, tab_persona = st.tabs(["✍️ Vygenerovat příspěvek", "➕ Přidat personu"])
 
 # ====================== 1)  Vygenerovat příspěvek =============================
 with tab_post:
@@ -70,9 +68,10 @@ with tab_post:
         st.success("Hotovo! Zde je vygenerovaný příspěvek:")
         st.markdown(post_md)
 
-# ====================== 2)  Správa person =====================================
+# ====================== 2)  Přidat personu ====================================
 with tab_persona:
-    st.subheader("➕ Přidat novou personu")
+    st.subheader("Přidat novou personu")
+
     with st.form("persona_add_form", clear_on_submit=True):
         col1, col2 = st.columns(2)
 
@@ -82,7 +81,15 @@ with tab_persona:
             tone   = st.text_area("Tone of Voice*")
         with col2:
             style  = st.text_area("Styl psaní*")
-            lang   = st.selectbox("Jazyk*", ("Čeština", "Slovenština", "Angličtina", "Jiný"))
+            lang_choices = ("Čeština", "Slovenština", "Angličtina", "Jiný")
+            lang   = st.selectbox("Jazyk*", lang_choices)
+
+            # Pokud je vybráno „Jiný“, zobraz další pole
+            if lang == "Jiný":
+                custom_lang = st.text_input("Zadejte název jazyka*")
+            else:
+                custom_lang = ""
+
             sample = st.text_area("Ukázkový příspěvek*")
 
         submitted_persona_add = st.form_submit_button("Uložit personu")
@@ -91,13 +98,18 @@ with tab_persona:
         if not name.strip():
             st.error("Jméno je povinné.")
             st.stop()
+        if lang == "Jiný" and not custom_lang.strip():
+            st.error("Prosím zadej název jazyka.")
+            st.stop()
+
+        language_value = custom_lang.strip() if lang == "Jiný" else lang
 
         payload_add = {
             "name":     name.strip(),
             "role":     role.strip(),
             "tone":     tone.strip(),
             "style":    style.strip(),
-            "language": lang,
+            "language": language_value,
             "sample":   sample.strip()
         }
 
@@ -111,30 +123,3 @@ with tab_persona:
         st.session_state.person_list.append(name.strip())
         st.success("Persona uložena ✔️")
         rerun()
-
-    # --------------- Mazání persony ------------------------------------------
-    st.markdown("---")
-    st.subheader("🗑 Smazat existující personu")
-
-    if st.session_state.person_list:
-        with st.form("persona_delete_form"):
-            to_delete = st.selectbox("Vyber personu k odstranění",
-                                     st.session_state.person_list)
-            submitted_delete = st.form_submit_button("Smazat personu",
-                                                     help="Trvale odstraní z tabulky")
-
-        if submitted_delete:
-            payload_del = {"name": to_delete}
-            with st.spinner("Odebírám personu…"):
-                try:
-                    requests.post(WEBHOOK_PERSONA_DELETE, json=payload_del, timeout=30).raise_for_status()
-                except Exception as e:
-                    st.error(f"Chyba při mazání: {e}")
-                    st.stop()
-
-            # odstraň lokálně a aktualizuj UI
-            st.session_state.person_list = [p for p in st.session_state.person_list if p != to_delete]
-            st.success(f"Persona „{to_delete}“ byla smazána ✔️")
-            rerun()
-    else:
-        st.info("Žádné persony k dispozici.")
