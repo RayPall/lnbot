@@ -1,17 +1,15 @@
 # streamlit_app.py
 # ---------------------------------------------------------------------------
-# Jednostránková aplikace:
-#   • Generování LinkedIn příspěvku (odeslání na WEBHOOK_POST)
-#   • Přidání nové persony (odeslání na WEBHOOK_PERSONA + okamžitá aktualizace listu)
+# Aplikace pro:
+#   • generování LinkedIn příspěvků (WEBHOOK_POST)
+#   • přidávání nových person (WEBHOOK_PERSONA) – po uložení se hned objeví v seznamu
 # ---------------------------------------------------------------------------
 
-import json
-import requests
-import streamlit as st
+import requests, streamlit as st
 
-# --- Konstanta: Make webhooky -------------------------------------------------
+# --- Make webhooky ------------------------------------------------------------
 WEBHOOK_POST    = "https://hook.eu2.make.com/6m46qtelfmarmwpq1jqgomm403eg5xkw"
-WEBHOOK_PERSONA = "https://hook.eu2.make.com/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"   # ← doplň svoji URL
+WEBHOOK_PERSONA = "https://hook.eu2.make.com/9yo8y77db7i6do272joo7ybfoue1qcoc"   # ← doplň
 
 # --- Výchozí seznam person ----------------------------------------------------
 DEFAULT_PERSONAS = [
@@ -19,12 +17,19 @@ DEFAULT_PERSONAS = [
     "Kristína Pastierik", "Lucie Jahnová"
 ]
 
-# --- Inicializace session_state ----------------------------------------------
+# --- Session‑state ------------------------------------------------------------
 if "person_list" not in st.session_state:
     st.session_state.person_list = DEFAULT_PERSONAS.copy()
 
 if "show_persona_form" not in st.session_state:
     st.session_state.show_persona_form = False
+
+# --- pomocná funkce pro rerun (kompatibilita různých verzí Streamlit) ---------
+def do_rerun():
+    if hasattr(st, "rerun"):               # Streamlit ≥ 1.26
+        st.rerun()
+    else:                                  # starší verze
+        st.experimental_rerun()
 
 # ----------------------------------------------------------------------------- 
 st.set_page_config(page_title="LinkedIn bot", page_icon="📝")
@@ -40,7 +45,6 @@ with st.form("post_form"):
     email = st.text_input("Na jaký e‑mail poslat draft?")
     submitted_post = st.form_submit_button("Odeslat")
 
-# ---- Odeslat na Make ---------------------------------------------------------
 if submitted_post:
     post_payload = {
         "personName":   persona,
@@ -56,26 +60,23 @@ if submitted_post:
             st.error(f"Chyba při komunikaci s Make: {e}")
             st.stop()
 
-    # bezpečné vytažení klíče „post“
+    # bezpečné vytažení textu
     try:
         post_text = res.json().get("post", "")
-    except (ValueError, AttributeError):
+    except Exception:
         post_text = res.text
 
     post_md = post_text.strip().replace("\n", "  \n")   # 2 mezery = hard‑break
     st.success("Hotovo! Zde je vygenerovaný příspěvek:")
     st.markdown(post_md)
 
-# ===================== 2) PŘIDAT NOVOU PERSONU ================================
+# ===================== 2) PŘIDÁNÍ NOVÉ PERSONY ================================
 st.markdown("---")
 st.header("➕ Přidat novou personu")
 
-# -- přepínač mezi tlačítkem a formulářem --------------------------------------
 if not st.session_state.show_persona_form:
-    if st.button("Přidat personu"):
-        st.session_state.show_persona_form = True
-        st.experimental_rerun()
-
+    st.button("Přidat personu", key="show_form_btn",
+              on_click=lambda: st.session_state.update(show_persona_form=True))
 else:
     with st.form("persona_form", clear_on_submit=True):
         col1, col2 = st.columns(2)
@@ -91,7 +92,6 @@ else:
 
         submitted_persona = st.form_submit_button("Uložit personu")
 
-    # ---- Odeslat novou personu na Make ---------------------------------------
     if submitted_persona:
         if not name.strip():
             st.error("Jméno je povinné.")
@@ -114,8 +114,8 @@ else:
                 st.error(f"Chyba při ukládání: {e}")
                 st.stop()
 
-        # úspěch -> přidat do seznamu a obnovit UI
+        # přidej jméno do runtime seznamu a zavři formulář
         st.session_state.person_list.append(name.strip())
         st.session_state.show_persona_form = False
         st.success("Persona uložena ✔️")
-        st.experimental_rerun()
+        do_rerun()
