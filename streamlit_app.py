@@ -4,7 +4,7 @@ import os, json, requests, streamlit as st
 POST_WEBHOOK        = "https://hook.eu2.make.com/6m46qtelfmarmwpq1jqgomm403eg5xkw"
 ADD_PERSONA_WEBHOOK = os.getenv(
     "ADD_PERSONA_WEBHOOK",
-    "https://hook.eu2.make.com/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")  # ⬅︎ nový webhook
+    "https://hook.eu2.make.com/9yo8y77db7i6do272joo7ybfoue1qcoc")  # ⬅︎ nový webhook
 
 st.set_page_config(page_title="LinkedIn bot", page_icon="📝")
 
