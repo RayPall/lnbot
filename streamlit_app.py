@@ -118,4 +118,3 @@ else:
         st.session_state.person_list.append(name.strip())
         st.session_state.show_persona_form = False
         st.success("Persona uložena ✔️")
-        st.experimental_rerun()
