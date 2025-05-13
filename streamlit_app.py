@@ -1,83 +1,79 @@
 # streamlit_app.py
 # ---------------------------------------------------------------------------
-# Aplikace pro:
-#   • generování LinkedIn příspěvků (WEBHOOK_POST)
-#   • přidávání nových person (WEBHOOK_PERSONA) – po uložení se hned objeví v seznamu
+#  ▸ Záložka 1 –  ✍️  Vygenerovat příspěvek  (odesílá na WEBHOOK_POST)
+#  ▸ Záložka 2 –  ➕  Přidat personu         (odesílá na WEBHOOK_PERSONA)
+#  ▸ Po úspěšném přidání se jméno hned objeví v radiu na 1. záložce
 # ---------------------------------------------------------------------------
 
 import requests, streamlit as st
 
-# --- Make webhooky ------------------------------------------------------------
+# --------- Make webhooky ------------------------------------------------------
 WEBHOOK_POST    = "https://hook.eu2.make.com/6m46qtelfmarmwpq1jqgomm403eg5xkw"
-WEBHOOK_PERSONA = "https://hook.eu2.make.com/9yo8y77db7i6do272joo7ybfoue1qcoc"   # ← doplň
+WEBHOOK_PERSONA = "https://hook.eu2.make.com/9yo8y77db7i6do272joo7ybfoue1qcoc"
 
-# --- Výchozí seznam person ----------------------------------------------------
+# --------- Výchozí seznam person ---------------------------------------------
 DEFAULT_PERSONAS = [
     "Daniel Šturm", "Martin Cígler", "Marek Steiger",
     "Kristína Pastierik", "Lucie Jahnová"
 ]
 
-# --- Session‑state ------------------------------------------------------------
+# --------- Session‑state ------------------------------------------------------
 if "person_list" not in st.session_state:
     st.session_state.person_list = DEFAULT_PERSONAS.copy()
 
-if "show_persona_form" not in st.session_state:
-    st.session_state.show_persona_form = False
-
-# --- pomocná funkce pro rerun (kompatibilita různých verzí Streamlit) ---------
-def do_rerun():
-    if hasattr(st, "rerun"):               # Streamlit ≥ 1.26
+def rerun():
+    """verze‑safe rerun"""
+    if hasattr(st, "rerun"):
         st.rerun()
-    else:                                  # starší verze
+    else:
         st.experimental_rerun()
 
-# ----------------------------------------------------------------------------- 
+# ------------------------------------------------------------------------------
 st.set_page_config(page_title="LinkedIn bot", page_icon="📝")
-st.title("LinkedIn bot 📝")
+st.title("LinkedIn bot")
 
-# ===================== 1) GENERÁTOR PŘÍSPĚVKU =================================
-with st.form("post_form"):
-    topic = st.text_area("Jaké má být téma příspěvku?")
-    persona = st.radio(
-        "Čím stylem má být příspěvek napsán?",
-        st.session_state.person_list
-    )
-    email = st.text_input("Na jaký e‑mail poslat draft?")
-    submitted_post = st.form_submit_button("Odeslat")
+tab_post, tab_persona = st.tabs(["✍️ Vygenerovat příspěvek", "➕ Přidat personu"])
 
-if submitted_post:
-    post_payload = {
-        "personName":   persona,
-        "postContent":  topic,
-        "responseMail": email
-    }
+# ====================== 1)  Vygenerovat příspěvek =============================
+with tab_post:
+    st.subheader("Vygenerovat LinkedIn příspěvek")
+    with st.form("post_form"):
+        topic = st.text_area("Jaké má být téma příspěvku?")
+        persona = st.radio(
+            "Čím stylem má být příspěvek napsán?",
+            st.session_state.person_list
+        )
+        email = st.text_input("Na jaký e‑mail poslat draft?")
+        submitted_post = st.form_submit_button("Odeslat")
 
-    with st.spinner("Generuji pomocí ChatGPT…"):
+    if submitted_post:
+        payload = {
+            "personName":   persona,
+            "postContent":  topic,
+            "responseMail": email
+        }
+
+        with st.spinner("Generuji pomocí ChatGPT…"):
+            try:
+                res = requests.post(WEBHOOK_POST, json=payload, timeout=120)
+                res.raise_for_status()
+            except Exception as e:
+                st.error(f"Chyba při komunikaci s Make: {e}")
+                st.stop()
+
         try:
-            res = requests.post(WEBHOOK_POST, json=post_payload, timeout=120)
-            res.raise_for_status()
-        except Exception as e:
-            st.error(f"Chyba při komunikaci s Make: {e}")
-            st.stop()
+            post_text = res.json().get("post", "")
+        except Exception:
+            post_text = res.text
 
-    # bezpečné vytažení textu
-    try:
-        post_text = res.json().get("post", "")
-    except Exception:
-        post_text = res.text
+        post_md = post_text.strip().replace("\n", "  \n")
+        st.success("Hotovo! Zde je vygenerovaný příspěvek:")
+        st.markdown(post_md)
 
-    post_md = post_text.strip().replace("\n", "  \n")   # 2 mezery = hard‑break
-    st.success("Hotovo! Zde je vygenerovaný příspěvek:")
-    st.markdown(post_md)
+# ====================== 2)  Přidat personu ====================================
+with tab_persona:
+    st.subheader("Přidat novou personu")
 
-# ===================== 2) PŘIDÁNÍ NOVÉ PERSONY ================================
-st.markdown("---")
-st.header("➕ Přidat novou personu")
-
-if not st.session_state.show_persona_form:
-    st.button("Přidat personu", key="show_form_btn",
-              on_click=lambda: st.session_state.update(show_persona_form=True))
-else:
     with st.form("persona_form", clear_on_submit=True):
         col1, col2 = st.columns(2)
 
@@ -108,14 +104,13 @@ else:
 
         with st.spinner("Ukládám personu…"):
             try:
-                rp = requests.post(WEBHOOK_PERSONA, json=persona_payload, timeout=30)
-                rp.raise_for_status()
+                res_p = requests.post(WEBHOOK_PERSONA, json=persona_payload, timeout=30)
+                res_p.raise_for_status()
             except Exception as e:
                 st.error(f"Chyba při ukládání: {e}")
                 st.stop()
 
-        # přidej jméno do runtime seznamu a zavři formulář
+        # přidej jméno do runtime seznamu a přepni zpět na první tab
         st.session_state.person_list.append(name.strip())
-        st.session_state.show_persona_form = False
         st.success("Persona uložena ✔️")
-        do_rerun()
+        rerun()                  # přenačte stránku → radio na 1. tab má novou personu
