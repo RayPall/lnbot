@@ -1,84 +1,121 @@
-import os, json, requests, streamlit as st
+# streamlit_app.py
+# ---------------------------------------------------------------------------
+# Jednostránková aplikace:
+#   • Generování LinkedIn příspěvku (odeslání na WEBHOOK_POST)
+#   • Přidání nové persony (odeslání na WEBHOOK_PERSONA + okamžitá aktualizace listu)
+# ---------------------------------------------------------------------------
 
-# --- dvě webhook URL -----------------------------------------------------------
-POST_WEBHOOK        = "https://hook.eu2.make.com/6m46qtelfmarmwpq1jqgomm403eg5xkw"
-ADD_PERSONA_WEBHOOK = os.getenv(
-    "ADD_PERSONA_WEBHOOK",
-    "https://hook.eu2.make.com/9yo8y77db7i6do272joo7ybfoue1qcoc")  # ⬅︎ nový webhook
+import json
+import requests
+import streamlit as st
 
+# --- Konstanta: Make webhooky -------------------------------------------------
+WEBHOOK_POST    = "https://hook.eu2.make.com/6m46qtelfmarmwpq1jqgomm403eg5xkw"
+WEBHOOK_PERSONA = "https://hook.eu2.make.com/9yo8y77db7i6do272joo7ybfoue1qcoc"   # ← doplň svoji URL
+
+# --- Výchozí seznam person ----------------------------------------------------
+DEFAULT_PERSONAS = [
+    "Daniel Šturm", "Martin Cígler", "Marek Steiger",
+    "Kristína Pastierik", "Lucie Jahnová"
+]
+
+# --- Inicializace session_state ----------------------------------------------
+if "person_list" not in st.session_state:
+    st.session_state.person_list = DEFAULT_PERSONAS.copy()
+
+if "show_persona_form" not in st.session_state:
+    st.session_state.show_persona_form = False
+
+# ----------------------------------------------------------------------------- 
 st.set_page_config(page_title="LinkedIn bot", page_icon="📝")
+st.title("LinkedIn bot 📝")
 
-# ------------------------------------------------------------------------------
-tab_post, tab_persona = st.tabs(["✍️ Vygenerovat příspěvek", "➕ Přidat personu"])
+# ===================== 1) GENERÁTOR PŘÍSPĚVKU =================================
+with st.form("post_form"):
+    topic = st.text_area("Jaké má být téma příspěvku?")
+    persona = st.radio(
+        "Čím stylem má být příspěvek napsán?",
+        st.session_state.person_list
+    )
+    email = st.text_input("Na jaký e‑mail poslat draft?")
+    submitted_post = st.form_submit_button("Odeslat")
 
-# ═════════════════════ 1) GENEROVÁNÍ PŘÍSPĚVKU ════════════════════════════════
-with tab_post:
-    st.header("Vygenerovat příspěvek")
-    with st.form("post_form"):
-        topic = st.text_area("Jaké má být téma příspěvku?")
-        persona = st.radio(
-            "Čím stylem má být příspěvek napsán?",
-            ("Daniel Šturm", "Martin Cígler", "Marek Steiger",
-             "Kristína Pastierik", "Lucie Jahnová"))
-        email = st.text_input("Na jaký e‑mail poslat draft?")
-        send_post = st.form_submit_button("Odeslat")
+# ---- Odeslat na Make ---------------------------------------------------------
+if submitted_post:
+    post_payload = {
+        "personName":   persona,
+        "postContent":  topic,
+        "responseMail": email
+    }
 
-    if send_post:
-        payload = {
-            "personName": persona,
-            "postContent": topic,
-            "responseMail": email
-        }
-        with st.spinner("Generuji pomocí ChatGPT…"):
-            res = requests.post(POST_WEBHOOK, json=payload, timeout=120)
-
-        if not res.ok:
-            st.error(f"Chyba {res.status_code}: {res.text}")
+    with st.spinner("Generuji pomocí ChatGPT…"):
+        try:
+            res = requests.post(WEBHOOK_POST, json=post_payload, timeout=120)
+            res.raise_for_status()
+        except Exception as e:
+            st.error(f"Chyba při komunikaci s Make: {e}")
             st.stop()
 
-        try:
-            post = res.json()["post"]
-        except Exception:
-            # fallback – odříznout { "post": "..."}
-            raw = res.text.strip()
-            post = raw.split(":", 1)[1].rsplit("}", 1)[0].strip(' "')
+    # bezpečné vytažení klíče „post“
+    try:
+        post_text = res.json().get("post", "")
+    except (ValueError, AttributeError):
+        post_text = res.text
 
-        st.success("Hotovo! Zde je vygenerovaný příspěvek:")
-        st.markdown(post.replace("\n", "  \n"))
+    post_md = post_text.strip().replace("\n", "  \n")   # 2 mezery = hard‑break
+    st.success("Hotovo! Zde je vygenerovaný příspěvek:")
+    st.markdown(post_md)
 
-# ═════════════════════ 2) PŘIDÁNÍ PERSONY ════════════════════════════════════
-with tab_persona:
-    st.header("Přidat novou personu")
+# ===================== 2) PŘIDAT NOVOU PERSONU ================================
+st.markdown("---")
+st.header("➕ Přidat novou personu")
+
+# -- přepínač mezi tlačítkem a formulářem --------------------------------------
+if not st.session_state.show_persona_form:
+    if st.button("Přidat personu"):
+        st.session_state.show_persona_form = True
+        st.experimental_rerun()
+
+else:
     with st.form("persona_form", clear_on_submit=True):
-        p_name   = st.text_input("Jméno*", max_chars=50)
-        p_role   = st.text_input("Role / pozice*", max_chars=80)
-        p_tone   = st.text_area("Tone of Voice*", height=70)
-        p_style  = st.text_area("Styl psaní*", height=70)
-        p_lang   = st.selectbox("Jazyk*", ["Čeština", "Angličtina", "Slovenština"])
-        p_sample = st.text_area("Ukázkový příspěvek*", height=120)
+        col1, col2 = st.columns(2)
 
-        add_persona = st.form_submit_button("Uložit personu")
+        with col1:
+            name  = st.text_input("Jméno*")
+            role  = st.text_input("Role / pozice*")
+            tone  = st.text_area("Tone of Voice*")
+        with col2:
+            style   = st.text_area("Styl psaní*")
+            lang    = st.selectbox("Jazyk*", ("Čeština", "Slovenština", "Angličtina", "Jiný"))
+            sample  = st.text_area("Ukázkový příspěvek*")
 
-    if add_persona:
-        if not all([p_name, p_role, p_tone, p_style, p_sample]):
-            st.error("Vyplň prosím všechna povinná pole označená *")
+        submitted_persona = st.form_submit_button("Uložit personu")
+
+    # ---- Odeslat novou personu na Make ---------------------------------------
+    if submitted_persona:
+        if not name.strip():
+            st.error("Jméno je povinné.")
             st.stop()
 
         persona_payload = {
-            "name":     p_name,
-            "role":     p_role,
-            "tone":     p_tone,
-            "style":    p_style,
-            "language": p_lang,
-            "sample":   p_sample
+            "name":     name.strip(),
+            "role":     role.strip(),
+            "tone":     tone.strip(),
+            "style":    style.strip(),
+            "language": lang,
+            "sample":   sample.strip()
         }
 
-        with st.spinner("Ukládám personu do Google Sheetu…"):
-            resp = requests.post(ADD_PERSONA_WEBHOOK,
-                                 json=persona_payload,
-                                 timeout=30)
+        with st.spinner("Ukládám personu…"):
+            try:
+                rp = requests.post(WEBHOOK_PERSONA, json=persona_payload, timeout=30)
+                rp.raise_for_status()
+            except Exception as e:
+                st.error(f"Chyba při ukládání: {e}")
+                st.stop()
 
-        if resp.ok:
-            st.success("Persona byla uložena ✅")
-        else:
-            st.error(f"Nepodařilo se uložit personu: {resp.status_code} {resp.text}")
+        # úspěch -> přidat do seznamu a obnovit UI
+        st.session_state.person_list.append(name.strip())
+        st.session_state.show_persona_form = False
+        st.success("Persona uložena ✔️")
+        st.experimental_rerun()
