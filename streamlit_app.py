@@ -13,7 +13,7 @@ from bs4 import BeautifulSoup
 
 # --- Make webhooky ------------------------------------------------------------
 WEBHOOK_POST    = "https://hook.eu2.make.com/6m46qtelfmarmwpq1jqgomm403eg5xkw"
-WEBHOOK_PERSONA = "https://hook.eu2.make.com/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"   # ← doplň
+WEBHOOK_PERSONA = "https://hook.eu2.make.com/9yo8y77db7i6do272joo7ybfoue1qcoc"   # ← doplň
 
 # --- Výchozí persony ----------------------------------------------------------
 DEFAULT_PERSONAS = [
