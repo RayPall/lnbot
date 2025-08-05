@@ -44,7 +44,7 @@ with tab_post:
         payload = {
             "personName":  persona,
             "postContent": topic,
-            "personMail":  person_mail.strip()
+            "responseMail":  person_mail.strip()
         }
 
         with st.spinner("Generuji pomocí ChatGPT…"):
