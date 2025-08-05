@@ -18,6 +18,7 @@ DEFAULT_PERSONAS = [
 if "person_list" not in st.session_state:
     st.session_state.person_list = DEFAULT_PERSONAS.copy()
 
+
 def rerun():
     (st.rerun if hasattr(st, "rerun") else st.experimental_rerun)()
 
@@ -36,13 +37,14 @@ with tab_post:
             "Čím stylem má být příspěvek napsán?",
             st.session_state.person_list
         )
+        person_mail = st.text_input("E‑mailová adresa")
         submitted_post = st.form_submit_button("Odeslat")
 
     if submitted_post:
         payload = {
             "personName":  persona,
-            "postContent": topic
-            # e‑mail jsme odstranili
+            "postContent": topic,
+            "personMail":  person_mail.strip()
         }
 
         with st.spinner("Generuji pomocí ChatGPT…"):
