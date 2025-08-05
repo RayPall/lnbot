@@ -12,7 +12,7 @@ WEBHOOK_PERSONA_ADD = "https://hook.eu2.make.com/9yo8y77db7i6do272joo7ybfoue1qco
 
 DEFAULT_PERSONAS = [
     "Daniel Šturm", "Martin Cígler", "Marek Steiger",
-    "Kristína Pastierik", "Lucie Jahnová", "Seyfor", "Evala"
+    "Kristína Pastierik", "Lucie Jahnová", "Jana Danišová", "Seyfor", "Evala"
 ]
 
 if "person_list" not in st.session_state:
