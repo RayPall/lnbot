@@ -61,7 +61,7 @@ with tab_post:
             "Čím stylem má být příspěvek napsán?",
             st.session_state.person_list
         )
-        person_mail = st.text_input("E-mailová adresa")
+        person_mail = st.text_input("E-mailová adresa - nepovinný údaj")
         submitted_post = st.form_submit_button("Odeslat")
 
     if submitted_post:
