@@ -15,7 +15,7 @@ PERSONA_FILE = "personas.json"
 
 DEFAULT_PERSONAS_FALLBACK = [
     "Daniel Šturm", "Martin Cígler", "Marek Steiger",
-    "Kristína Pastierik", "Lucie Jahnová", "Jana Danišová",
+    "Kristína Pastierik", "Jana Danišová",
     "Zuzana Dubová", "Seyfor", "Evala"
 ]
 
