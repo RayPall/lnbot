@@ -4,29 +4,53 @@
 #  ➕  Přidat personu            (WEBHOOK_PERSONA_ADD)
 # ---------------------------------------------------------------------------
 
-import requests, streamlit as st
+import requests, streamlit as st, json, os
 
 # --------- Make webhooky ------------------------------------------------------
 WEBHOOK_POST        = "https://hook.eu2.make.com/6m46qtelfmarmwpq1jqgomm403eg5xkw"
 WEBHOOK_PERSONA_ADD = "https://hook.eu2.make.com/9yo8y77db7i6do272joo7ybfoue1qcoc"
 
-DEFAULT_PERSONAS = [
+# --------- Persistence --------------------------------------------------------
+PERSONA_FILE = "personas.json"
+
+DEFAULT_PERSONAS_FALLBACK = [
     "Daniel Šturm", "Martin Cígler", "Marek Steiger",
-    "Kristína Pastierik", "Lucie Jahnová", "Jana Danišová", "Zuzana Dubová", "Seyfor", "Evala"
+    "Kristína Pastierik", "Lucie Jahnová", "Jana Danišová",
+    "Zuzana Dubová", "Seyfor", "Evala"
 ]
 
-if "person_list" not in st.session_state:
-    st.session_state.person_list = DEFAULT_PERSONAS.copy()
+def load_personas() -> list[str]:
+    """Load personas from JSON file or fallback to hard‑coded defaults."""
+    if os.path.exists(PERSONA_FILE):
+        try:
+            with open(PERSONA_FILE, "r", encoding="utf-8") as f:
+                personas = json.load(f)
+                if isinstance(personas, list) and personas:
+                    return personas
+        except Exception as e:
+            st.warning(f"Nepodařilo se načíst uložené persony: {e}")
+    return DEFAULT_PERSONAS_FALLBACK.copy()
 
+def save_personas(person_list: list[str]) -> None:
+    """Persist personas to disk so they survive server restarts."""
+    try:
+        with open(PERSONA_FILE, "w", encoding="utf-8") as f:
+            json.dump(person_list, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        st.warning(f"Nepodařilo se uložit persony: {e}")
+
+# Initialise personas in session state ----------------------------------------
+if "person_list" not in st.session_state:
+    st.session_state.person_list = load_personas()
 
 def rerun():
     (st.rerun if hasattr(st, "rerun") else st.experimental_rerun)()
 
-# ------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 st.set_page_config(page_title="LinkedIn bot", page_icon="📝")
 st.title("LinkedIn bot")
 
-tab_post, tab_persona = st.tabs(["✍️ Vygenerovat příspěvek", "➕ Přidat personu"])
+tab_post, tab_persona = st.tabs(["✍️ Vygenerovat příspěvek", "➕ Přidat personu"])
 
 # ====================== 1)  Vygenerovat příspěvek =============================
 with tab_post:
@@ -37,14 +61,14 @@ with tab_post:
             "Čím stylem má být příspěvek napsán?",
             st.session_state.person_list
         )
-        person_mail = st.text_input("E‑mailová adresa (pro odeslání draftu příspěvku)")
+        person_mail = st.text_input("E-mailová adresa")
         submitted_post = st.form_submit_button("Odeslat")
 
     if submitted_post:
         payload = {
             "personName":  persona,
             "postContent": topic,
-            "responseMail":  person_mail.strip()
+            "personMail":  person_mail.strip()
         }
 
         with st.spinner("Generuji pomocí ChatGPT…"):
@@ -52,7 +76,7 @@ with tab_post:
                 res = requests.post(WEBHOOK_POST, json=payload, timeout=120)
                 res.raise_for_status()
             except Exception as e:
-                st.error(f"Chyba při komunikaci s Make: {e}")
+                st.error(f"Chyba při komunikaci s Make: {e}")
                 st.stop()
 
         try:
@@ -111,6 +135,9 @@ with tab_persona:
                 st.error(f"Chyba při ukládání: {e}")
                 st.stop()
 
+        # ✨ Přidej personu do session state i na disk (přežije restart) ---------
         st.session_state.person_list.append(name.strip())
+        save_personas(st.session_state.person_list)
+
         st.success("Persona uložena ✔️")
         rerun()
